@@ -39,7 +39,7 @@ update : Action -> Model -> ( Model, Effects Action )
 update action model =
   case action of
     UpdatedList list ->
-      ( { model | mrStats = list}, Effects.tick Tick )
+      ( { model | mrStats = list }, Effects.tick Tick )
     Tick clockTime ->
       let
         refreshInterval = 5 * second
@@ -94,15 +94,13 @@ formatTimeToMerge ttm =
     minutes = ttm // 60
     hours = ttm // 3600
     days = hours // 24
-    remainingHours = hours - days * 24
-    remainingMinutes = minutes - hours * 60
   in
-    if days > 2 then
+    if days > 1 then
       toString days ++ " days"
-    else if remainingHours > 2 then
-      toString remainingHours ++ " hours"
-    else if remainingMinutes > 1 then
-      toString remainingMinutes ++ " minutes"
+    else if hours > 1 then
+      toString hours ++ " hours"
+    else if minutes > 1 then
+      toString minutes ++ " minutes"
     else "instantly"
 
 -- STYLES
@@ -130,7 +128,7 @@ getMergeRequests =
   Http.get decodeMRs backendUrl
       |> Task.toMaybe
       |> Task.map (\s -> mrFromMaybe s)
-      |> Task.map (\mrs -> UpdatedList mrs )
+      |> Task.map (\mrs -> UpdatedList mrs)
       |> Effects.task
 
 mrFromMaybe : Maybe (List MergeRequestStats) -> List MergeRequestStats
