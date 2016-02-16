@@ -8,7 +8,7 @@ import Json.Decode as Decode exposing (Decoder, (:=))
 import Task exposing (Task)
 import Time exposing (Time, second)
 import Signal exposing (Address)
-import List exposing (map)
+import List exposing (sortWith, map)
 
 
 -- MODEL
@@ -20,7 +20,7 @@ type alias MergeRequest =
 
 type alias MergeRequestStats =
   { mergeRequest : MergeRequest
-  , timeToMerge : Int
+  , timeToMerge : Float
   , commentsQty : Int
   , url : String
   }
@@ -41,7 +41,15 @@ update : Action -> Model -> (Model, Effects Action)
 update action model =
   case action of
     UpdateList list ->
-      ({ model | mrStats = list }, Effects.tick Tick)
+      let
+        flippedComparison a b =
+          if a.timeToMerge > b.timeToMerge then
+            LT
+          else
+            GT
+        sortedList = sortWith flippedComparison list
+      in
+        ({ model | mrStats = sortedList }, Effects.tick Tick)
     Tick clockTime ->
       let
         refreshInterval = 5 * second
@@ -89,11 +97,11 @@ statsView stats =
   , td [] [ text (formatTimeToMerge stats.timeToMerge) ]
   ]
 
-formatTimeToMerge : Int -> String
+formatTimeToMerge : Float -> String
 formatTimeToMerge ttm =
   let
-    minutes = ttm // 60
-    hours = ttm // 3600
+    minutes = truncate(ttm / 60)
+    hours = truncate(ttm / 3600)
     days = hours // 24
   in
     if days > 1 then
@@ -127,16 +135,22 @@ centeredStyle =
 mergeRequestsFetchEffect : Effects Action
 mergeRequestsFetchEffect =
   Http.get decodeMRs backendUrl
-      |> Task.toMaybe
-      |> Task.map (\s -> mrFromMaybe s)
+      |> Task.toResult
+      |> Task.map (\s -> mrFromResult s)
       |> Task.map (\mrs -> UpdateList mrs)
       |> Effects.task
 
-mrFromMaybe : Maybe (List MergeRequestStats) -> List MergeRequestStats
-mrFromMaybe s =
-  case s of
-    Nothing -> [{ mergeRequest = { title = "ERROR", upvotes = 0 }, timeToMerge = 0, commentsQty = 0, url = "" }]
-    Just mrs -> mrs
+mrFromResult : Result Http.Error (List MergeRequestStats) -> List MergeRequestStats
+mrFromResult s = case s of
+    Result.Err err -> [{ mergeRequest = { title = "ERROR: " ++ (errorToString err), upvotes = 0 }, timeToMerge = 0, commentsQty = 0, url = "" }]
+    Result.Ok mrs -> mrs
+
+errorToString : Http.Error -> String
+errorToString e = case e of
+                    Http.Timeout -> "timeout"
+                    Http.NetworkError -> "network error"
+                    Http.UnexpectedPayload s -> "unexpected payload - " ++ s
+                    Http.BadResponse c s -> "bad response - " ++ (toString c) ++ " - " ++ s 
 
 backendUrl : String
 backendUrl = "http://localhost:8080/mrs"
@@ -149,6 +163,6 @@ decodeMRs = Decode.list
                   ("upvotes" := Decode.int)
                in Decode.object4 MergeRequestStats
                   ("mergeRequest" := mrDecoder)
-                  ("timeToMerge" := Decode.int)
+                  ("timeToMerge" := Decode.float)
                   ("commentsQty" := Decode.int)
                   ("url" := Decode.string)
