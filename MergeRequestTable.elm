@@ -16,6 +16,7 @@ import List exposing (sortWith, map)
 type alias MergeRequest =
   { title : String
   , upvotes : Int
+  , updated_at : String
   }
 
 type alias MergeRequestStats =
@@ -42,12 +43,12 @@ update action model =
   case action of
     UpdateList list ->
       let
-        flippedComparison a b =
-          if a.timeToMerge > b.timeToMerge then
-            LT
-          else
+        mrComparison a b =
+          if a.mergeRequest.updated_at < b.mergeRequest.updated_at then
             GT
-        sortedList = sortWith flippedComparison list
+          else
+            LT
+        sortedList = sortWith mrComparison list
       in
         ({ model | mrStats = sortedList }, Effects.tick Tick)
     Tick clockTime ->
@@ -83,7 +84,7 @@ view address model =
 
 headers : List Html
 headers =
-  ["title", "upvotes", "comments", "TTM"]
+  ["title", "comments", "time to merge"]
     |> map text
     |> map (List.repeat 1)
     |> map (th [])
@@ -92,7 +93,6 @@ statsView : MergeRequestStats -> Html
 statsView stats =
   tr []
   [ td [] [ a [ href stats.url ] [ text stats.mergeRequest.title ] ]
-  , td [] [ text (toString stats.mergeRequest.upvotes)]
   , td [] [ text (toString stats.commentsQty)]
   , td [] [ text (formatTimeToMerge stats.timeToMerge) ]
   ]
@@ -142,7 +142,7 @@ mergeRequestsFetchEffect =
 
 mrFromResult : Result Http.Error (List MergeRequestStats) -> List MergeRequestStats
 mrFromResult s = case s of
-    Result.Err err -> [{ mergeRequest = { title = "ERROR: " ++ (errorToString err), upvotes = 0 }, timeToMerge = 0, commentsQty = 0, url = "" }]
+    Result.Err err -> [{ mergeRequest = { title = "ERROR: " ++ (errorToString err), upvotes = 0, updated_at = "" }, timeToMerge = 0, commentsQty = 0, url = "" }]
     Result.Ok mrs -> mrs
 
 errorToString : Http.Error -> String
@@ -158,9 +158,10 @@ backendUrl = "http://localhost:8080/mrs"
 decodeMRs : Decoder (List MergeRequestStats)
 decodeMRs = Decode.list
             <| let
-                mrDecoder = Decode.object2 MergeRequest
+                mrDecoder = Decode.object3 MergeRequest
                   ("title" := Decode.string)
                   ("upvotes" := Decode.int)
+                  ("updated_at" := Decode.string)
                in Decode.object4 MergeRequestStats
                   ("mergeRequest" := mrDecoder)
                   ("timeToMerge" := Decode.float)
