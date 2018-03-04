@@ -1,0 +1,14 @@
+{
+  "mrs": [
+  {
+    "mergeRequest": {
+      "title": "My changes",
+      "upvotes": 1,
+      "updated_at": ""
+    },
+    "timeToMerge": 10000.2,
+    "commentsQty": 3,
+    "url": "http://github.com/user1/repo2"
+  }
+  ]
+}
